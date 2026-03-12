@@ -1,0 +1,72 @@
+[
+  {
+    "productName": "Classic Tee",
+    "category": "Apparel",
+    "salesAmount": 1200,
+    "dateSold": "2026-01-05",
+    "region": "North"
+  },
+  {
+    "productName": "Classic Tee",
+    "category": "Apparel",
+    "salesAmount": 980,
+    "dateSold": "2026-02-12",
+    "region": "South"
+  },
+  {
+    "productName": "Running Shoes",
+    "category": "Footwear",
+    "salesAmount": 2400,
+    "dateSold": "2026-01-18",
+    "region": "West"
+  },
+  {
+    "productName": "Running Shoes",
+    "category": "Footwear",
+    "salesAmount": 1850,
+    "dateSold": "2026-03-03",
+    "region": "East"
+  },
+  {
+    "productName": "Smartwatch",
+    "category": "Accessories",
+    "salesAmount": 3100,
+    "dateSold": "2025-11-21",
+    "region": "North"
+  },
+  {
+    "productName": "Smartwatch",
+    "category": "Accessories",
+    "salesAmount": 2700,
+    "dateSold": "2025-12-02",
+    "region": "West"
+  },
+  {
+    "productName": "Yoga Mat",
+    "category": "Fitness",
+    "salesAmount": 900,
+    "dateSold": "2026-02-01",
+    "region": "South"
+  },
+  {
+    "productName": "Yoga Mat",
+    "category": "Fitness",
+    "salesAmount": 600,
+    "dateSold": "2026-02-18",
+    "region": "East"
+  },
+  {
+    "productName": "Water Bottle",
+    "category": "Fitness",
+    "salesAmount": 700,
+    "dateSold": "2026-03-09",
+    "region": "North"
+  },
+  {
+    "productName": "Hoodie",
+    "category": "Apparel",
+    "salesAmount": 1500,
+    "dateSold": "2026-03-04",
+    "region": "West"
+  }
+]
