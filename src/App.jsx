@@ -106,8 +106,13 @@ export default function App() {
           <div className="kpi-band">
             <KpiCards data={filteredData} filters={filters} datasetId={datasetId} />
           </div>
-          <DataChatPanel datasetId={datasetId} data={filteredData} />
-          <DataChatPanel datasetId={datasetId} data={filteredData} enableModes />
+          <DataChatPanel datasetId={datasetId} data={filteredData} titleSuffix="(V1)" />
+          <DataChatPanel
+            datasetId={datasetId}
+            data={filteredData}
+            enableModes
+            titleSuffix="(V2)"
+          />
           <div className="dashboard-grid">
             <section className="grid-table">
               <TracksTable data={filteredData} datasetId={datasetId} />

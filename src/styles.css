@@ -32,6 +32,7 @@ body {
   font-family: system-ui, -apple-system, BlinkMacSystemFont, 'SF Pro Text', sans-serif;
   background: radial-gradient(circle at top left, #e5e7eb 0, #f9fafb 40%, #f3f4f6 100%);
   color: var(--text);
+  overflow-x: hidden;
 }
 
 button,
@@ -133,6 +134,7 @@ textarea {
   display: flex;
   flex-direction: column;
   gap: 16px;
+  width: 100%;
 }
 
 .panel-root {
@@ -453,7 +455,7 @@ textarea {
   border-radius: 14px;
   background: #f9fafb;
   border: 1px solid var(--border-subtle);
-  max-height: 432px;
+  max-height: min(432px, 60vh);
   overflow-y: auto;
 }
 
@@ -619,7 +621,7 @@ textarea {
 .mode-menu {
   position: absolute;
   left: 0;
-  bottom: calc(100% + 8px); /* 8px gap above the Plan/input row */
+  bottom: calc(100% + 8px);
   background: #ffffff;
   border-radius: 14px;
   border: 1px solid var(--border-subtle);
@@ -930,7 +932,8 @@ textarea {
 
 .table-card .table-wrapper {
   max-height: 320px;
-  overflow: auto;
+  overflow-y: auto;
+  overflow-x: auto;
 }
 
 .tracks-table {
@@ -1164,4 +1167,3 @@ textarea {
     height: 260px;
   }
 }
-

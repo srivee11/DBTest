@@ -300,7 +300,7 @@ function buildAnswer(datasetId, question, rows) {
   return buildSpotifyAnswer(question, rows);
 }
 
-export function DataChatPanel({ datasetId, data, enableModes = false }) {
+export function DataChatPanel({ datasetId, data, enableModes = false, titleSuffix }) {
   const [input, setInput] = useState(() => CHAT_CACHE[datasetId]?.input ?? '');
   const [selectedSuggestionId, setSelectedSuggestionId] = useState(
     () => CHAT_CACHE[datasetId]?.selectedSuggestionId ?? 'spotify-bar'
@@ -614,7 +614,10 @@ export function DataChatPanel({ datasetId, data, enableModes = false }) {
     <section className="panel-root chat-panel">
       <div className="chat-header">
         <div>
-          <h2>Chat with DataBrain</h2>
+          <h2>
+            Chat with DataBrain
+            {titleSuffix ? ` ${titleSuffix}` : ''}
+          </h2>
           <span className="panel-subtitle">
             Ask questions in natural language. I’ll turn them into queries and friendly summaries.
           </span>
