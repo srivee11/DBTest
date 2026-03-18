@@ -113,6 +113,13 @@ export default function App() {
             enableModes
             titleSuffix="(V2)"
           />
+          <DataChatPanel
+            datasetId={datasetId}
+            data={filteredData}
+            titleOverride="Discover Agent"
+            subtitleOverride="Discover Agent – continuously monitors your KPIs and automatically drills into segments when something moves."
+            variant="discover"
+          />
           <div className="dashboard-grid">
             <section className="grid-table">
               <TracksTable data={filteredData} datasetId={datasetId} />

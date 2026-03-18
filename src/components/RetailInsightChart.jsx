@@ -30,7 +30,9 @@ export function RetailInsightChart({ data, chartType }) {
     totalOrders,
     totalCustomers,
     totalChurn,
-    whySeries
+    whySeries,
+    discoverDeltaCategories,
+    kpiDeltas
   } = useMemo(() => {
     const byCategory = new Map();
     const byProduct = new Map();
@@ -39,6 +41,9 @@ export function RetailInsightChart({ data, chartType }) {
     const byRegionPrevWeek = new Map();
     const byRegionLastWeek = new Map();
     const byMonthCategory = new Map();
+    const byMonthOrders = new Map();
+    const byMonthCustomers = new Map();
+    const byMonthChurn = new Map();
 
     let totalSalesAcc = 0;
     let totalOrdersAcc = 0;
@@ -73,6 +78,14 @@ export function RetailInsightChart({ data, chartType }) {
         const monthLabel = MONTH_LABELS[date.getMonth()];
         const key = `${monthLabel}::${category}`;
         byMonthCategory.set(key, (byMonthCategory.get(key) || 0) + value);
+
+        // Track month-level aggregates for KPI deltas
+        byMonthOrders.set(monthLabel, (byMonthOrders.get(monthLabel) || 0) + orders);
+        byMonthCustomers.set(
+          monthLabel,
+          (byMonthCustomers.get(monthLabel) || 0) + customers
+        );
+        byMonthChurn.set(monthLabel, (byMonthChurn.get(monthLabel) || 0) + churn);
       }
     });
 
@@ -144,6 +157,63 @@ export function RetailInsightChart({ data, chartType }) {
       }));
     }
 
+    // Discover Agent delta by category: compare latest vs previous month in the series
+    let discoverDeltaCategoriesLocal = [];
+    let kpiDeltasLocal = null;
+    if (monthsOrdered.length >= 2) {
+      const latestMonthLabel = monthsOrdered[monthsOrdered.length - 1];
+      const prevMonthLabel = monthsOrdered[monthsOrdered.length - 2];
+
+      const catsSet = new Set();
+      byMonthCategory.forEach((_, key) => {
+        const [, category] = key.split('::');
+        catsSet.add(category);
+      });
+
+      discoverDeltaCategoriesLocal = Array.from(catsSet).map((category) => {
+        const latestKey = `${latestMonthLabel}::${category}`;
+        const prevKey = `${prevMonthLabel}::${category}`;
+        const current = byMonthCategory.get(latestKey) || 0;
+        const previous = byMonthCategory.get(prevKey) || 0;
+        return {
+          category,
+          previous,
+          current,
+          delta: current - previous
+        };
+      });
+
+      // Keep categories ordered by magnitude of change so the biggest movement is easiest to spot
+      discoverDeltaCategoriesLocal.sort((a, b) => Math.abs(b.delta) - Math.abs(a.delta));
+
+      // Simple MoM deltas for KPI summary cards
+      const latestSales = Array.from(byMonthCategory.entries()).reduce((sum, [key, val]) => {
+        const [monthLabel] = key.split('::');
+        return monthLabel === latestMonthLabel ? sum + val : sum;
+      }, 0);
+      const prevSales = Array.from(byMonthCategory.entries()).reduce((sum, [key, val]) => {
+        const [monthLabel] = key.split('::');
+        return monthLabel === prevMonthLabel ? sum + val : sum;
+      }, 0);
+
+      const latestOrders = byMonthOrders.get(latestMonthLabel) || 0;
+      const prevOrders = byMonthOrders.get(prevMonthLabel) || 0;
+      const latestCustomers = byMonthCustomers.get(latestMonthLabel) || 0;
+      const prevCustomers = byMonthCustomers.get(prevMonthLabel) || 0;
+      const latestChurn = byMonthChurn.get(latestMonthLabel) || 0;
+      const prevChurn = byMonthChurn.get(prevMonthLabel) || 0;
+
+      const pct = (latest, prev) =>
+        prev ? Math.round(((latest - prev) / prev) * 100 * 10) / 10 : null;
+
+      kpiDeltasLocal = {
+        salesPct: pct(latestSales, prevSales),
+        ordersPct: pct(latestOrders, prevOrders),
+        customersPct: pct(latestCustomers, prevCustomers),
+        churnPct: pct(latestChurn, prevChurn)
+      };
+    }
+
     return {
       aggregatedByCategory: aggregatedByCategoryArr,
       aggregatedByProduct: aggregatedByProductArr,
@@ -155,7 +225,9 @@ export function RetailInsightChart({ data, chartType }) {
       totalOrders: totalOrdersAcc,
       totalCustomers: totalCustomersAcc,
       totalChurn: totalChurnAcc,
-      whySeries: whySeriesLocal
+      whySeries: whySeriesLocal,
+      discoverDeltaCategories: discoverDeltaCategoriesLocal,
+      kpiDeltas: kpiDeltasLocal
     };
   }, [data]);
 
@@ -188,6 +260,8 @@ export function RetailInsightChart({ data, chartType }) {
             ? 'Churned customers by region (last month)'
             : chartType === 'kpiSummary'
             ? 'Core KPIs for this quarter'
+            : chartType === 'discoverDelta'
+            ? 'Change in revenue by category vs previous period'
             : 'Sales by product category'}
         </h2>
         <span className="panel-subtitle">
@@ -199,6 +273,8 @@ export function RetailInsightChart({ data, chartType }) {
             ? 'Key performance indicators aggregated for the current filters.'
             : chartType === 'whyRevenue'
             ? 'Comparing revenue by region for last week versus the previous week.'
+            : chartType === 'discoverDelta'
+            ? 'Comparing current vs previous period revenue by category so you can see which areas drove the change.'
             : "Focusing on this quarter's sales across product categories."}
         </span>
       </div>
@@ -211,6 +287,18 @@ export function RetailInsightChart({ data, chartType }) {
                 <span className="kpi-value">
                   {totalSales.toLocaleString(undefined, { maximumFractionDigits: 0 })}
                 </span>
+                {kpiDeltas?.salesPct != null && (
+                  <span
+                    className={`kpi-delta ${
+                      kpiDeltas.salesPct >= 0 ? 'kpi-delta-up' : 'kpi-delta-down'
+                    }`}
+                  >
+                    <span className="kpi-delta-icon">
+                      {kpiDeltas.salesPct >= 0 ? '▲' : '▼'}
+                    </span>
+                    {Math.abs(kpiDeltas.salesPct).toFixed(1)}% vs prior month
+                  </span>
+                )}
               </div>
             </div>
             <div className="kpi-card">
@@ -219,6 +307,18 @@ export function RetailInsightChart({ data, chartType }) {
                 <span className="kpi-value">
                   {totalOrders.toLocaleString(undefined, { maximumFractionDigits: 0 })}
                 </span>
+                {kpiDeltas?.ordersPct != null && (
+                  <span
+                    className={`kpi-delta ${
+                      kpiDeltas.ordersPct >= 0 ? 'kpi-delta-up' : 'kpi-delta-down'
+                    }`}
+                  >
+                    <span className="kpi-delta-icon">
+                      {kpiDeltas.ordersPct >= 0 ? '▲' : '▼'}
+                    </span>
+                    {Math.abs(kpiDeltas.ordersPct).toFixed(1)}% vs prior month
+                  </span>
+                )}
               </div>
             </div>
             <div className="kpi-card">
@@ -227,6 +327,18 @@ export function RetailInsightChart({ data, chartType }) {
                 <span className="kpi-value">
                   {totalCustomers.toLocaleString(undefined, { maximumFractionDigits: 0 })}
                 </span>
+                {kpiDeltas?.customersPct != null && (
+                  <span
+                    className={`kpi-delta ${
+                      kpiDeltas.customersPct >= 0 ? 'kpi-delta-up' : 'kpi-delta-down'
+                    }`}
+                  >
+                    <span className="kpi-delta-icon">
+                      {kpiDeltas.customersPct >= 0 ? '▲' : '▼'}
+                    </span>
+                    {Math.abs(kpiDeltas.customersPct).toFixed(1)}% vs prior month
+                  </span>
+                )}
               </div>
             </div>
             <div className="kpi-card">
@@ -235,6 +347,19 @@ export function RetailInsightChart({ data, chartType }) {
                 <span className="kpi-value">
                   {totalChurn.toLocaleString(undefined, { maximumFractionDigits: 0 })}
                 </span>
+                {kpiDeltas?.churnPct != null && (
+                  <span
+                    className={`kpi-delta ${
+                      // For churn, a decrease is good (green), an increase is bad (red)
+                      kpiDeltas.churnPct >= 0 ? 'kpi-delta-down' : 'kpi-delta-up'
+                    }`}
+                  >
+                    <span className="kpi-delta-icon">
+                      {kpiDeltas.churnPct >= 0 ? '▲' : '▼'}
+                    </span>
+                    {Math.abs(kpiDeltas.churnPct).toFixed(1)}% vs prior month
+                  </span>
+                )}
               </div>
             </div>
           </div>
@@ -358,6 +483,48 @@ export function RetailInsightChart({ data, chartType }) {
                 radius={[4, 4, 0, 0]}
               />
             </BarChart>
+          ) : chartType === 'discoverDelta' ? (
+            discoverDeltaCategories.length > 0 ? (
+              <BarChart
+                data={discoverDeltaCategories}
+                margin={{ top: 12, right: 16, bottom: 8, left: 0 }}
+              >
+                <CartesianGrid strokeDasharray="3 3" vertical={false} />
+                <XAxis dataKey="category" />
+                <YAxis />
+                <Tooltip />
+                <Legend />
+                <Bar
+                  dataKey="previous"
+                  name="Previous period"
+                  fill="#e5e7eb"
+                  radius={[4, 4, 0, 0]}
+                />
+                <Bar
+                  dataKey="current"
+                  name="Current period"
+                  fill="var(--accent)"
+                  radius={[4, 4, 0, 0]}
+                />
+              </BarChart>
+            ) : (
+              <BarChart
+                data={aggregatedByCategory}
+                margin={{ top: 12, right: 16, bottom: 8, left: 0 }}
+              >
+                <CartesianGrid strokeDasharray="3 3" vertical={false} />
+                <XAxis dataKey="category" />
+                <YAxis />
+                <Tooltip />
+                <Legend />
+                <Bar
+                  dataKey="sales"
+                  name="Sales"
+                  fill="var(--accent)"
+                  radius={[4, 4, 0, 0]}
+                />
+              </BarChart>
+            )
           ) : (
             <BarChart
               data={aggregatedByCategory}

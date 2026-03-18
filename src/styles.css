@@ -8,6 +8,8 @@
   --accent: #4f46e5;
   --accent-soft: rgba(79, 70, 229, 0.08);
   --danger: #ef4444;
+  --radar-green: #22c55e;
+  --radar-green-soft: rgba(34, 197, 94, 0.14);
   --radius-lg: 18px;
   --radius-md: 12px;
   --shadow-soft: 0 22px 60px rgba(15, 23, 42, 0.12);
@@ -438,6 +440,232 @@ textarea {
   white-space: nowrap;
 }
 
+.discover-controls {
+  margin-top: 10px;
+  padding: 8px 10px;
+  border-radius: 12px;
+  border: 1px solid var(--border-subtle);
+  background: #f9fafb;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.discover-row {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.discover-group {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.discover-label {
+  font-size: 11px;
+  color: var(--text-muted);
+}
+
+.discover-kpi-chips,
+.discover-schedule-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.discover-actions {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  align-items: flex-start;
+}
+
+.discover-run-btn {
+  font-size: 12px;
+}
+
+.discover-hint {
+  font-size: 11px;
+  color: var(--text-muted);
+}
+
+.discover-stepper {
+  margin-top: 4px;
+  padding-top: 6px;
+  border-top: 1px dashed var(--border-subtle);
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  font-size: 11px;
+  color: var(--text-muted);
+}
+
+.discover-step {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.discover-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 999px;
+  border: 1px solid var(--border-subtle);
+}
+
+.discover-dot-idle {
+  background: #f9fafb;
+}
+
+.discover-dot-complete {
+  background: #22c55e;
+  border-color: #16a34a;
+}
+
+.discover-dot-active {
+  background: transparent;
+  border-color: #4f46e5;
+  border-width: 2px;
+  border-top-color: transparent;
+  animation: chatSpinner 900ms linear infinite;
+}
+
+.discover-monitor {
+  margin-top: 6px;
+  padding-top: 6px;
+  border-top: 1px dashed var(--border-subtle);
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 8px;
+  font-size: 11px;
+}
+
+.discover-monitor-left {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.discover-monitor-text {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.discover-monitor-title {
+  font-weight: 500;
+}
+
+.discover-monitor-sub {
+  color: var(--text-muted);
+}
+
+.discover-monitor-timer {
+  color: var(--text-muted);
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.discover-stop-btn {
+  border-radius: 999px;
+  border: 1px solid var(--border-subtle);
+  background: #ffffff;
+  padding: 4px 8px;
+  font-size: 11px;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  cursor: pointer;
+}
+
+.discover-stop-icon {
+  width: 9px;
+  height: 9px;
+  border-radius: 3px;
+  background: #ef4444;
+}
+
+.anomaly-accent {
+  color: var(--radar-green);
+}
+
+.discover-anomaly-pill {
+  margin-left: 6px;
+  padding: 2px 8px;
+  border-radius: 999px;
+  font-size: 10px;
+  font-weight: 500;
+  color: #9a3412;
+  background: rgba(251, 146, 60, 0.18);
+  border: 1px solid rgba(248, 113, 113, 0.6);
+}
+
+@keyframes radarBlipPulse {
+  0% {
+    transform: scale(0.9);
+    opacity: 1;
+  }
+  60% {
+    transform: scale(1.2);
+    opacity: 1;
+  }
+  100% {
+    transform: scale(1);
+    opacity: 0.8;
+  }
+}
+
+.discover-radar-blip-pulse {
+  animation: radarBlipPulse 520ms ease-out 1;
+}
+
+.discover-radar {
+  position: relative;
+  width: 32px;
+  height: 32px;
+  border-radius: 999px;
+  background: radial-gradient(circle, var(--radar-green-soft), rgba(5, 46, 22, 0.85));
+  overflow: hidden;
+  box-shadow: 0 0 0 1px rgba(16, 185, 129, 0.4);
+}
+
+.discover-radar-sweep {
+  position: absolute;
+  width: 100%;
+  height: 100%;
+  background: conic-gradient(
+    rgba(34, 197, 94, 0.4),
+    rgba(34, 197, 94, 0.05),
+    transparent 40%
+  );
+  animation: radarSweep 1800ms linear infinite;
+  transform-origin: 50% 50%;
+}
+
+.discover-radar-blip {
+  position: absolute;
+  width: 6px;
+  height: 6px;
+  border-radius: 999px;
+  background: var(--radar-green);
+  top: 6px;
+  right: 8px;
+  box-shadow: 0 0 6px rgba(34, 197, 94, 0.9);
+}
+
+@keyframes radarSweep {
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(360deg);
+  }
+}
+
 .chat-suggestions-row {
   display: flex;
   flex-direction: column;
@@ -509,6 +737,16 @@ textarea {
   background: #0f172a;
   color: #ffffff;
   border-radius: 14px;
+}
+
+.chat-bubble-anomaly {
+  background: linear-gradient(
+    135deg,
+    rgba(251, 146, 60, 0.12),
+    rgba(254, 243, 199, 0.9)
+  );
+  border: 1px solid rgba(248, 113, 113, 0.6);
+  color: #9a3412;
 }
 
 .chat-name {
@@ -857,6 +1095,26 @@ textarea {
   font-weight: 500;
 }
 
+.kpi-delta {
+  margin-top: 2px;
+  font-size: 12px;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.kpi-delta-icon {
+  font-size: 11px;
+}
+
+.kpi-delta-up {
+  color: #16a34a;
+}
+
+.kpi-delta-down {
+  color: #dc2626;
+}
+
 .chart-card .chart-container {
   height: 220px;
 }
@@ -1166,4 +1424,24 @@ textarea {
   .chart-container {
     height: 260px;
   }
+}
+
+/* Recharts tooltip – improve hover contrast for WCAG */
+.recharts-default-tooltip {
+  background: #0f172a !important;
+  border-radius: 8px !important;
+  border: 1px solid rgba(148, 163, 184, 0.7) !important;
+  color: #f9fafb !important;
+  font-size: 12px !important;
+  box-shadow: 0 10px 30px rgba(15, 23, 42, 0.4) !important;
+}
+
+.recharts-default-tooltip .recharts-tooltip-label {
+  color: #e5e7eb !important;
+  font-weight: 500;
+  margin-bottom: 4px;
+}
+
+.recharts-default-tooltip .recharts-tooltip-item {
+  color: #f9fafb !important;
 }

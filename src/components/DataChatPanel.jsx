@@ -12,6 +12,31 @@ const RETAIL_TREND_QUERY =
 const RETAIL_REGION_QUERY =
   'Which regions over- or under-perform for my core categories?';
 
+// Discover Agent – KPI watcher specific prompts for retail
+const RETAIL_DISCOVER_SUGGESTIONS = [
+  {
+    id: 'retail-discover-kpi-health',
+    chartType: 'bar',
+    tag: 'KPI HEALTH',
+    label: 'Review this month’s core KPIs',
+    prompt: 'How are my core KPIs doing this month compared to last month?'
+  },
+  {
+    id: 'retail-discover-revenue-move',
+    chartType: 'bar',
+    tag: 'ROOT CAUSE',
+    label: 'Explain the biggest revenue change',
+    prompt: 'Which segment explains the biggest revenue change vs last month?'
+  },
+  {
+    id: 'retail-discover-churn-move',
+    chartType: 'churnByRegion',
+    tag: 'CHURN',
+    label: 'Where is churn spiking?',
+    prompt: 'Where are churned customers increasing the most?'
+  }
+];
+
 const RETAIL_SUGGESTIONS = [
   {
     id: 'retail-bar',
@@ -81,6 +106,14 @@ const SPOTIFY_FOLLOW_UPS = [
   'Show only explicit tracks.',
   'Compare this month to last month.',
   'Show the underlying listener rows.'
+];
+
+// Discover Agent quick follow-ups – focused on changes and drivers
+const RETAIL_DISCOVER_FOLLOW_UPS = [
+  'What changed most since last month?',
+  'Which region explains most of the revenue change?',
+  'Which products contributed most to this KPI movement?',
+  'Show me a breakdown by category and region for this change.'
 ];
 
 const CHAT_CACHE = {};
@@ -300,7 +333,16 @@ function buildAnswer(datasetId, question, rows) {
   return buildSpotifyAnswer(question, rows);
 }
 
-export function DataChatPanel({ datasetId, data, enableModes = false, titleSuffix }) {
+export function DataChatPanel({
+  datasetId,
+  data,
+  enableModes = false,
+  titleSuffix,
+  titleOverride,
+  subtitleOverride,
+  badgeLabel,
+  variant
+}) {
   const [input, setInput] = useState(() => CHAT_CACHE[datasetId]?.input ?? '');
   const [selectedSuggestionId, setSelectedSuggestionId] = useState(
     () => CHAT_CACHE[datasetId]?.selectedSuggestionId ?? 'spotify-bar'
@@ -310,7 +352,11 @@ export function DataChatPanel({ datasetId, data, enableModes = false, titleSuffi
   );
   const [messages, setMessages] = useState(() => {
     const cached = CHAT_CACHE[datasetId]?.messages;
-    return cached && cached.length ? cached : buildWelcomeMessages();
+    if (cached && cached.length) return cached;
+    const isRetailInit = datasetId === 'retail_store';
+    const isDiscoverInit = variant === 'discover';
+    // For Discover Agent V3, start with an empty stream until the agent runs.
+    return isRetailInit && isDiscoverInit ? [] : buildWelcomeMessages();
   });
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [activeModeId, setActiveModeId] = useState(
@@ -322,7 +368,12 @@ export function DataChatPanel({ datasetId, data, enableModes = false, titleSuffi
   const activeRows = useMemo(() => data || [], [data]);
 
   const isRetail = datasetId === 'retail_store';
-  const suggestions = isRetail ? RETAIL_SUGGESTIONS : SPOTIFY_SUGGESTIONS;
+  const isDiscoverAgent = variant === 'discover';
+  const suggestions = isRetail
+    ? isDiscoverAgent
+      ? RETAIL_DISCOVER_SUGGESTIONS
+      : RETAIL_SUGGESTIONS
+    : SPOTIFY_SUGGESTIONS;
   const basePlaceholder = isRetail
     ? RETAIL_REGION_QUERY
     : SPOTIFY_ROYALTY_TREND_QUERY;
@@ -330,6 +381,20 @@ export function DataChatPanel({ datasetId, data, enableModes = false, titleSuffi
     CHAT_MODES.find((m) => m.id === activeModeId) || CHAT_MODES[0];
   const activeModeLabel = `${activeMode.badge} mode`;
   const placeholderText = enableModes ? activeModeLabel : basePlaceholder;
+
+  // Discover Agent state
+  const [discoverSelectedKpis, setDiscoverSelectedKpis] = useState([
+    'revenue',
+    'orders'
+  ]);
+  const [discoverSchedule, setDiscoverSchedule] = useState('monthly');
+  // discoverStatus: idle | preparing | monitoring
+  const [discoverStatus, setDiscoverStatus] = useState('idle');
+  const [discoverStep, setDiscoverStep] = useState(0);
+  const [discoverElapsedSec, setDiscoverElapsedSec] = useState(0);
+  const [discoverHasAnomaly, setDiscoverHasAnomaly] = useState(false);
+  const [discoverShouldPulse, setDiscoverShouldPulse] = useState(false);
+  const [discoverAnomalyCount, setDiscoverAnomalyCount] = useState(0);
 
   useEffect(() => {
     const cached = CHAT_CACHE[datasetId];
@@ -341,14 +406,18 @@ export function DataChatPanel({ datasetId, data, enableModes = false, titleSuffi
       );
       setChartType(cached.chartType ?? (isRetail ? 'bar' : 'topTracks'));
       setMessages(
-        cached.messages && cached.messages.length ? cached.messages : buildWelcomeMessages()
+        cached.messages && cached.messages.length
+          ? cached.messages
+          : isRetail && isDiscoverAgent
+          ? []
+          : buildWelcomeMessages()
       );
       setActiveModeId(cached.activeModeId ?? 'plan');
     } else {
       setInput('');
       setSelectedSuggestionId(isRetail ? 'retail-bar' : 'spotify-bar');
       setChartType(isRetail ? 'bar' : 'topTracks');
-      setMessages(buildWelcomeMessages());
+      setMessages(isRetail && isDiscoverAgent ? [] : buildWelcomeMessages());
       setActiveModeId('plan');
     }
 
@@ -369,6 +438,307 @@ export function DataChatPanel({ datasetId, data, enableModes = false, titleSuffi
       activeModeId
     };
   }, [datasetId, input, selectedSuggestionId, chartType, messages, activeModeId]);
+
+  const toggleDiscoverKpi = (kpi) => {
+    setDiscoverSelectedKpis((prev) =>
+      prev.includes(kpi) ? prev.filter((k) => k !== kpi) : [...prev, kpi]
+    );
+  };
+
+  const stopDiscoverAgent = () => {
+    if (!isRetail || !isDiscoverAgent) return;
+    setDiscoverStatus('idle');
+    setDiscoverStep(0);
+    setDiscoverElapsedSec(0);
+    setDiscoverHasAnomaly(false);
+    setDiscoverShouldPulse(false);
+    setDiscoverAnomalyCount(0);
+  };
+
+  const runDiscoverAgent = () => {
+    if (!isRetail || !isDiscoverAgent || discoverStatus === 'preparing') return;
+    if (!discoverSelectedKpis.length) {
+      // simple guard: require at least one KPI
+      setDiscoverSelectedKpis(['revenue']);
+    }
+
+    // Reset monitor state
+    setDiscoverStatus('preparing');
+    setDiscoverStep(1);
+    setDiscoverElapsedSec(0);
+    setDiscoverHasAnomaly(false);
+    setDiscoverShouldPulse(false);
+    setDiscoverAnomalyCount(0);
+
+    const kpiLabel = discoverSelectedKpis.join(', ');
+    const scheduleLabel =
+      discoverSchedule === 'hourly'
+        ? 'hourly'
+        : discoverSchedule === 'daily'
+        ? 'daily'
+        : 'monthly';
+
+    const introMessage = {
+      id: `a-discover-intro-${Date.now()}`,
+      role: 'assistant',
+      kind: 'text',
+      content: `I’m running the Discover Agent for ${kpiLabel} on a ${scheduleLabel} schedule, using the current retail dataset to learn what “normal” looks like and then search for meaningful changes.`,
+      status: 'complete',
+      timestamp: new Date().toISOString()
+    };
+    setMessages((prev) => [...prev, introMessage]);
+
+    // Step 2 after short delay: scanning for changes
+    window.setTimeout(() => {
+      setDiscoverStep(2);
+    }, 900);
+
+    // After preparation, start monitoring state (radar + timer)
+    window.setTimeout(() => {
+      setDiscoverStep(3);
+      setDiscoverStatus('monitoring');
+      setDiscoverElapsedSec(0);
+    }, 1900);
+  };
+
+  function computeDiscoverInsight(rows) {
+    if (!rows || !rows.length) {
+      return {
+        story:
+          "I couldn’t find enough retail data in the current view to learn normal ranges. Try widening your filters."
+      };
+    }
+
+    const withDates = rows.filter((r) => r.dateSold);
+    if (!withDates.length) {
+      return {
+        story:
+          "I couldn’t find date information for these rows, so I can’t compare against the previous period yet."
+      };
+    }
+
+    // Build simple month key as YYYY-MM to avoid ambiguity.
+    const monthTotals = new Map();
+    const byMonthCategory = new Map();
+    const byMonthCategoryRegion = new Map();
+    const byMonthCategoryRegionProduct = new Map();
+
+    withDates.forEach((r) => {
+      const monthKey = r.dateSold.slice(0, 7);
+      const amount = r.salesAmount || 0;
+      const category = r.category || 'Other';
+      const region = r.region || 'Unknown';
+      const product = r.productName || 'Unknown product';
+
+      monthTotals.set(monthKey, (monthTotals.get(monthKey) || 0) + amount);
+
+      const catKey = `${monthKey}::${category}`;
+      byMonthCategory.set(catKey, (byMonthCategory.get(catKey) || 0) + amount);
+
+      const catRegionKey = `${monthKey}::${category}::${region}`;
+      byMonthCategoryRegion.set(
+        catRegionKey,
+        (byMonthCategoryRegion.get(catRegionKey) || 0) + amount
+      );
+
+      const fullKey = `${monthKey}::${category}::${region}::${product}`;
+      byMonthCategoryRegionProduct.set(
+        fullKey,
+        (byMonthCategoryRegionProduct.get(fullKey) || 0) + amount
+      );
+    });
+
+    const monthKeys = Array.from(monthTotals.keys()).sort();
+    if (monthKeys.length < 2) {
+      return {
+        story:
+          "I need at least two months of data to compare KPI changes. Try expanding the date range."
+      };
+    }
+
+    const latestMonth = monthKeys[monthKeys.length - 1];
+    const prevMonth = monthKeys[monthKeys.length - 2];
+
+    const latestTotal = monthTotals.get(latestMonth) || 0;
+    const prevTotal = monthTotals.get(prevMonth) || 0;
+
+    if (!prevTotal) {
+      return {
+        story:
+          "I couldn’t compute a meaningful percentage change because the previous period has almost no revenue."
+      };
+    }
+
+    const overallDelta = latestTotal - prevTotal;
+    const overallChangePct = (overallDelta / prevTotal) * 100;
+
+    // Find category contributing most to delta
+    const catDeltas = [];
+    byMonthCategory.forEach((value, key) => {
+      const [monthKey, category] = key.split('::');
+      if (monthKey !== latestMonth && monthKey !== prevMonth) return;
+
+      const latestKey = `${latestMonth}::${category}`;
+      const prevKey = `${prevMonth}::${category}`;
+      const cur = byMonthCategory.get(latestKey) || 0;
+      const prev = byMonthCategory.get(prevKey) || 0;
+      const delta = cur - prev;
+
+      if (!catDeltas.find((c) => c.category === category)) {
+        catDeltas.push({ category, delta });
+      }
+    });
+
+    catDeltas.sort((a, b) => Math.abs(b.delta) - Math.abs(a.delta));
+    const topCategory = catDeltas[0];
+
+    let topRegion = null;
+    let topProduct = null;
+
+    if (topCategory) {
+      const regionDeltas = [];
+      byMonthCategoryRegion.forEach((value, key) => {
+        const [monthKey, category, region] = key.split('::');
+        if (category !== topCategory.category) return;
+        if (monthKey !== latestMonth && monthKey !== prevMonth) return;
+
+        const latestKey = `${latestMonth}::${category}::${region}`;
+        const prevKey = `${prevMonth}::${category}::${region}`;
+        const cur = byMonthCategoryRegion.get(latestKey) || 0;
+        const prev = byMonthCategoryRegion.get(prevKey) || 0;
+        const delta = cur - prev;
+        if (!regionDeltas.find((r) => r.region === region)) {
+          regionDeltas.push({ region, delta });
+        }
+      });
+
+      regionDeltas.sort((a, b) => Math.abs(b.delta) - Math.abs(a.delta));
+      topRegion = regionDeltas[0];
+
+      if (topRegion) {
+        const productDeltas = [];
+        byMonthCategoryRegionProduct.forEach((value, key) => {
+          const [monthKey, category, region, product] = key.split('::');
+          if (
+            category !== topCategory.category ||
+            region !== topRegion.region ||
+            (monthKey !== latestMonth && monthKey !== prevMonth)
+          ) {
+            return;
+          }
+
+          const latestKey = `${latestMonth}::${category}::${region}::${product}`;
+          const prevKey = `${prevMonth}::${category}::${region}::${product}`;
+          const cur = byMonthCategoryRegionProduct.get(latestKey) || 0;
+          const prevVal = byMonthCategoryRegionProduct.get(prevKey) || 0;
+          const delta = cur - prevVal;
+          if (!productDeltas.find((p) => p.product === product)) {
+            productDeltas.push({ product, delta });
+          }
+        });
+
+        productDeltas.sort((a, b) => Math.abs(b.delta) - Math.abs(a.delta));
+        topProduct = productDeltas[0];
+      }
+    }
+
+    const safeOverallDelta = overallDelta === 0 ? 1 : overallDelta;
+    const mainCategoryShare = topCategory
+      ? Math.round((Math.abs(topCategory.delta) / Math.abs(safeOverallDelta)) * 100)
+      : 0;
+    const overallPctRounded = Math.round(overallChangePct * 10) / 10;
+
+    const direction = overallChangePct >= 0 ? 'up' : 'down';
+
+    let story = `Revenue is ${direction} ${Math.abs(
+      overallPctRounded
+    ).toFixed(1)}% between ${prevMonth} and ${latestMonth}.`;
+
+    if (topCategory && topRegion && topProduct) {
+      story += ` Around ${mainCategoryShare}% of this change comes from ${topCategory.category} in the ${topRegion.region} region, mainly the Sports Shorts line.`;
+    } else if (topCategory && topRegion) {
+      story += ` Most of the movement is from ${topCategory.category} in the ${topRegion.region} region.`;
+    } else if (topCategory) {
+      story += ` The largest contribution comes from the ${topCategory.category} category.`;
+    }
+
+    story += ' I’ve broken down the change by category so you can see which areas moved the most.';
+
+    return { story };
+  }
+
+  // Timer effect for monitoring state
+  useEffect(() => {
+    if (discoverStatus !== 'monitoring') return;
+    const id = window.setInterval(() => {
+      setDiscoverElapsedSec((prev) => prev + 1);
+    }, 1000);
+    return () => window.clearInterval(id);
+  }, [discoverStatus]);
+
+  // After 8 seconds of monitoring, trigger anomaly insight once
+  useEffect(() => {
+    if (!isRetail || !isDiscoverAgent) return;
+    if (discoverStatus !== 'monitoring') return;
+    if (discoverHasAnomaly) return;
+    if (discoverElapsedSec < 8) return;
+
+    setDiscoverHasAnomaly(true);
+    setDiscoverAnomalyCount((prev) => prev + 1);
+    setDiscoverShouldPulse(true);
+
+    const insight = computeDiscoverInsight(activeRows);
+    const thinkingId = `a-discover-thinking-${Date.now()}`;
+    const thinkingMessage = {
+      id: thinkingId,
+      role: 'assistant',
+      kind: 'status',
+      content: null,
+      status: 'thinking',
+      timestamp: new Date().toISOString()
+    };
+    setMessages((prev) => [...prev, thinkingMessage]);
+
+    window.setTimeout(() => {
+      setMessages((prev) => {
+        const updated = prev.map((m) =>
+          m.id === thinkingId
+            ? {
+                ...m,
+                kind: 'retailChart',
+                chartType: 'discoverDelta',
+                content: insight.story,
+                status: 'complete'
+              }
+            : m
+        );
+
+        const uiMessage = {
+          id: `discover-ui-${Date.now()}`,
+          role: 'assistant',
+          kind: 'discoverUI',
+          content: null,
+          status: 'complete',
+          timestamp: new Date().toISOString()
+        };
+
+        return [...updated, uiMessage];
+      });
+
+      // allow the radar blip to pulse once, then settle
+      window.setTimeout(() => {
+        setDiscoverShouldPulse(false);
+      }, 520);
+    }, 1200);
+  }, [
+    activeRows,
+    discoverElapsedSec,
+    discoverHasAnomaly,
+    discoverStatus,
+    isDiscoverAgent,
+    isRetail,
+    setMessages
+  ]);
 
   const handleSubmit = (questionText) => {
     const trimmed = (questionText ?? input).trim();
@@ -544,12 +914,62 @@ export function DataChatPanel({ datasetId, data, enableModes = false, titleSuffi
         const retailSuggestion = RETAIL_SUGGESTIONS.find(
           (s) => s.prompt.toLowerCase() === trimmed.toLowerCase()
         );
-        const chartTypeForAnswer = isRegionCoreQuery
-          ? 'regionCore'
-          : retailSuggestion?.chartType || 'bar';
+
+        // Discover Agent specific mapping for follow-ups and suggestion cards
+        let discoverChartType = null;
+        let discoverText = null;
+        if (isDiscoverAgent) {
+          if (
+            lower ===
+            'how are my core kpis doing this month compared to last month?'
+          ) {
+            discoverChartType = 'kpiSummary';
+            discoverText =
+              'Here is a KPI summary comparing this month to the previous month so you can see how core metrics are moving together.';
+          } else if (
+            lower ===
+            'which segment explains the biggest revenue change vs last month?'
+          ) {
+            discoverChartType = 'discoverDelta';
+            discoverText =
+              'Here is the change in revenue by category compared to last month so you can see which segment explains the biggest move.';
+          } else if (lower === 'where are churned customers increasing the most?') {
+            discoverChartType = 'churnByRegion';
+            discoverText =
+              'Here is a view of churned customers by region so you can see where churn is spiking the most.';
+          } else if (lower === 'what changed most since last month?') {
+            discoverChartType = 'discoverDelta';
+            discoverText =
+              'Here is the change in revenue by category compared to last month so you can quickly see what moved the most.';
+          } else if (
+            lower === 'which region explains most of the revenue change?'
+          ) {
+            discoverChartType = 'regionCore';
+            discoverText =
+              'Here is how revenue changed by region so you can see which region explains most of the movement.';
+          } else if (
+            lower === 'which products contributed most to this kpi movement?'
+          ) {
+            discoverChartType = 'productBar';
+            discoverText =
+              'Here are the products contributing most to the revenue movement in the current view.';
+          } else if (
+            lower === 'show me a breakdown by category and region for this change.'
+          ) {
+            discoverChartType = 'regionCore';
+            discoverText =
+              'Here is a regional breakdown for your core categories so you can see where performance changed the most.';
+          }
+        }
+
+        const chartTypeForAnswer =
+          discoverChartType ||
+          (isRegionCoreQuery ? 'regionCore' : retailSuggestion?.chartType || 'bar');
 
         let retailText;
-        if (chartTypeForAnswer === 'productBar') {
+        if (discoverText) {
+          retailText = discoverText;
+        } else if (chartTypeForAnswer === 'productBar') {
           retailText =
             'Here are your top-selling and lower-performing products based on sales in the current view.';
         } else if (chartTypeForAnswer === 'line') {
@@ -615,15 +1035,155 @@ export function DataChatPanel({ datasetId, data, enableModes = false, titleSuffi
       <div className="chat-header">
         <div>
           <h2>
-            Chat with DataBrain
+            {titleOverride || 'Chat with DataBrain'}
             {titleSuffix ? ` ${titleSuffix}` : ''}
           </h2>
           <span className="panel-subtitle">
-            Ask questions in natural language. I’ll turn them into queries and friendly summaries.
+            {subtitleOverride ??
+              'Ask questions in natural language. I’ll turn them into queries and friendly summaries.'}
           </span>
         </div>
-        <div className="chat-badge-beta">NLP · Beta</div>
+        {badgeLabel && <div className="chat-badge-beta">{badgeLabel}</div>}
       </div>
+
+      {isRetail && isDiscoverAgent && (
+        <div className="discover-controls">
+          <div className="discover-row">
+            <div className="discover-group">
+              <span className="discover-label">KPIs to monitor</span>
+              <div className="discover-kpi-chips">
+                {[
+                  { id: 'revenue', label: 'Revenue' },
+                  { id: 'orders', label: 'Orders' },
+                  { id: 'margin', label: 'Margin' },
+                  { id: 'churn', label: 'Churn' }
+                ].map((kpi) => (
+                  <button
+                    key={kpi.id}
+                    type="button"
+                    className={`pill discover-kpi-pill ${
+                      discoverSelectedKpis.includes(kpi.id) ? 'pill-selected' : 'pill-outline'
+                    }`}
+                    onClick={() => toggleDiscoverKpi(kpi.id)}
+                  >
+                    {kpi.label}
+                  </button>
+                ))}
+              </div>
+            </div>
+            <div className="discover-group">
+              <span className="discover-label">Schedule</span>
+              <div className="discover-schedule-chips">
+                {[
+                  { id: 'hourly', label: 'Hourly' },
+                  { id: 'daily', label: 'Daily' },
+                  { id: 'monthly', label: 'Monthly' }
+                ].map((opt) => (
+                  <button
+                    key={opt.id}
+                    type="button"
+                    className={`pill discover-schedule-pill ${
+                      discoverSchedule === opt.id ? 'pill-selected' : 'pill-outline'
+                    }`}
+                    onClick={() => setDiscoverSchedule(opt.id)}
+                  >
+                    {opt.label}
+                  </button>
+                ))}
+              </div>
+            </div>
+            <div className="discover-actions">
+              <button
+                type="button"
+                className="btn-primary discover-run-btn"
+                onClick={runDiscoverAgent}
+                disabled={discoverStatus === 'preparing'}
+              >
+                {discoverStatus === 'preparing' ? 'Preparing…' : 'Run agent'}
+              </button>
+              <span className="discover-hint">
+                Simulated run on sample retail data – no real warehouse connected.
+              </span>
+            </div>
+          </div>
+          {discoverStatus === 'preparing' && (
+            <div className="discover-stepper">
+              <div className="discover-step">
+                <span
+                  className={`discover-dot ${
+                    discoverStep >= 1 ? 'discover-dot-complete' : 'discover-dot-idle'
+                  }`}
+                />
+                <span>Learning normal ranges for selected KPIs…</span>
+              </div>
+              <div className="discover-step">
+                <span
+                  className={`discover-dot ${
+                    discoverStep >= 2 ? 'discover-dot-complete' : 'discover-dot-idle'
+                  }`}
+                />
+                <span>Scanning for significant drops and spikes vs previous period…</span>
+              </div>
+              <div className="discover-step">
+                <span
+                  className={`discover-dot ${
+                    discoverStep >= 3 ? 'discover-dot-complete' : 'discover-dot-active'
+                  }`}
+                />
+                <span>Running root-cause analysis by region, category and product…</span>
+              </div>
+            </div>
+          )}
+          {discoverStatus === 'monitoring' && (
+            <div className="discover-monitor">
+              <div className="discover-monitor-left">
+                <div
+                  className={`discover-radar ${
+                    discoverHasAnomaly ? 'discover-radar-has-blip' : ''
+                  }`}
+                >
+                  <div className="discover-radar-sweep" />
+                  {discoverHasAnomaly && (
+                    <div
+                      className={
+                        'discover-radar-blip' +
+                        (discoverShouldPulse ? ' discover-radar-blip-pulse' : '')
+                      }
+                    />
+                  )}
+                </div>
+                <div className="discover-monitor-text">
+                  <div className="discover-monitor-title">
+                    Agent is monitoring
+                    {discoverAnomalyCount > 0 && (
+                      <span className="discover-anomaly-pill">
+                        {discoverAnomalyCount} Anomaly detected
+                      </span>
+                    )}
+                  </div>
+                  <div className="discover-monitor-sub">
+                    Tracking {discoverSelectedKpis.join(', ')} on a {discoverSchedule} basis.
+                  </div>
+                </div>
+              </div>
+              <div className="discover-monitor-timer">
+                <span>
+                  Running for {Math.floor(discoverElapsedSec / 60)}:
+                  {(discoverElapsedSec % 60).toString().padStart(2, '0')} min
+                </span>
+                <button
+                  type="button"
+                  className="discover-stop-btn"
+                  onClick={stopDiscoverAgent}
+                >
+                  <span className="discover-stop-icon" />
+                  Stop
+                </button>
+              </div>
+            </div>
+          )}
+        </div>
+      )}
 
       <div className="chat-stream" ref={scrollRef}>
         {messages.map((m) => (
@@ -639,7 +1199,11 @@ export function DataChatPanel({ datasetId, data, enableModes = false, titleSuffi
             <div
               className={
                 m.role === 'assistant'
-                  ? 'chat-bubble chat-bubble-assistant'
+                  ? `chat-bubble chat-bubble-assistant${
+                      m.kind === 'retailChart' && m.chartType === 'discoverDelta'
+                        ? ' chat-bubble-anomaly'
+                        : ''
+                    }`
                   : 'chat-bubble chat-bubble-user'
               }
             >
@@ -648,7 +1212,7 @@ export function DataChatPanel({ datasetId, data, enableModes = false, titleSuffi
               )}
               {m.role === 'user' && <div className="chat-name">You</div>}
 
-              {m.id === 'welcome' ? (
+              {m.id === 'welcome' && !isDiscoverAgent ? (
                 <>
                   <p className="chat-text">
                     Ask anything about this dataset. Here are a few starting points tailored
@@ -677,7 +1241,56 @@ export function DataChatPanel({ datasetId, data, enableModes = false, titleSuffi
                   <div className="chat-followups">
                     <span className="chat-followups-label">Quick follow-ups</span>
                     <div className="chat-followups-chips">
-                      {(isRetail ? RETAIL_FOLLOW_UPS : SPOTIFY_FOLLOW_UPS).map((f) => (
+                      {(
+                        isRetail
+                          ? isDiscoverAgent
+                            ? RETAIL_DISCOVER_FOLLOW_UPS
+                            : RETAIL_FOLLOW_UPS
+                          : SPOTIFY_FOLLOW_UPS
+                      ).map((f) => (
+                        <button
+                          key={f}
+                          type="button"
+                          className="pill pill-outline chat-followup-pill"
+                          onClick={() => handleFollowUpClick(f)}
+                        >
+                          {f}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                </>
+              ) : m.kind === 'discoverUI' ? (
+                <>
+                  <p className="chat-text">
+                    Here are a few angles you can probe now that the Discover Agent has
+                    surfaced a meaningful change.
+                  </p>
+                  <div className="chat-suggestions-row">
+                    {suggestions.map((q) => (
+                      <button
+                        key={q.id}
+                        type="button"
+                        className={`assistant-suggestion chat-suggestion-pill ${
+                          selectedSuggestionId === q.id ? 'is-selected' : ''
+                        }`}
+                        onClick={() => handleSuggestionClick(q)}
+                      >
+                        <span className="assistant-tag">{q.tag}</span>
+                        <span className="assistant-title">{q.label}</span>
+                      </button>
+                    ))}
+                  </div>
+                  <div className="chat-followups">
+                    <span className="chat-followups-label">Quick follow-ups</span>
+                    <div className="chat-followups-chips">
+                      {(
+                        isRetail
+                          ? isDiscoverAgent
+                            ? RETAIL_DISCOVER_FOLLOW_UPS
+                            : RETAIL_FOLLOW_UPS
+                          : SPOTIFY_FOLLOW_UPS
+                      ).map((f) => (
                         <button
                           key={f}
                           type="button"
