@@ -425,6 +425,48 @@ textarea {
   gap: 8px;
 }
 
+.chat-header-right {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.discover-chat-toggle {
+  border-radius: 999px;
+  border: 1px solid var(--border-subtle);
+  background: #ffffff;
+  width: 30px;
+  height: 30px;
+  padding: 0;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.discover-chat-toggle-icon {
+  width: 8px;
+  height: 8px;
+  border-right: 2px solid var(--text-muted);
+  border-bottom: 2px solid var(--text-muted);
+  transform: rotate(45deg);
+  margin-top: -2px;
+}
+
+.discover-chat-toggle-icon.is-collapsed {
+  transform: rotate(-135deg);
+  margin-top: 2px;
+}
+
+.discover-chat-collapsed-hint {
+  margin-top: 2px;
+  padding: 6px 10px;
+  border-radius: 12px;
+  border: 1px dashed rgba(148, 163, 184, 0.45);
+  color: var(--text-muted);
+  font-size: 12px;
+}
+
 .chat-header h2 {
   margin: 0;
   font-size: 14px;

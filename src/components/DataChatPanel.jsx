@@ -395,6 +395,9 @@ export function DataChatPanel({
   const [discoverHasAnomaly, setDiscoverHasAnomaly] = useState(false);
   const [discoverShouldPulse, setDiscoverShouldPulse] = useState(false);
   const [discoverAnomalyCount, setDiscoverAnomalyCount] = useState(0);
+  const [isDiscoverChatCollapsed, setIsDiscoverChatCollapsed] = useState(false);
+
+  const shouldCollapseDiscoverChat = isRetail && isDiscoverAgent && isDiscoverChatCollapsed;
 
   useEffect(() => {
     const cached = CHAT_CACHE[datasetId];
@@ -422,6 +425,7 @@ export function DataChatPanel({
     }
 
     setIsModeMenuOpen(false);
+    setIsDiscoverChatCollapsed(false);
   }, [datasetId, isRetail]);
 
   useEffect(() => {
@@ -453,6 +457,7 @@ export function DataChatPanel({
     setDiscoverHasAnomaly(false);
     setDiscoverShouldPulse(false);
     setDiscoverAnomalyCount(0);
+    setIsDiscoverChatCollapsed(false);
   };
 
   const runDiscoverAgent = () => {
@@ -1043,7 +1048,28 @@ export function DataChatPanel({
               'Ask questions in natural language. I’ll turn them into queries and friendly summaries.'}
           </span>
         </div>
-        {badgeLabel && <div className="chat-badge-beta">{badgeLabel}</div>}
+        <div className="chat-header-right">
+          {badgeLabel && <div className="chat-badge-beta">{badgeLabel}</div>}
+          {isRetail && isDiscoverAgent && (
+            <button
+              type="button"
+              className="discover-chat-toggle"
+              onClick={() => setIsDiscoverChatCollapsed((v) => !v)}
+              aria-label={
+                isDiscoverChatCollapsed
+                  ? 'Expand Discover Agent chat'
+                  : 'Collapse Discover Agent chat'
+              }
+            >
+              <span
+                className={
+                  'discover-chat-toggle-icon' +
+                  (isDiscoverChatCollapsed ? ' is-collapsed' : '')
+                }
+              />
+            </button>
+          )}
+        </div>
       </div>
 
       {isRetail && isDiscoverAgent && (
@@ -1185,7 +1211,17 @@ export function DataChatPanel({
         </div>
       )}
 
-      <div className="chat-stream" ref={scrollRef}>
+      {shouldCollapseDiscoverChat && (
+        <div className="discover-chat-collapsed-hint">
+          <span>Chat collapsed</span>
+        </div>
+      )}
+
+      <div
+        className="chat-stream"
+        ref={scrollRef}
+        style={{ display: shouldCollapseDiscoverChat ? 'none' : undefined }}
+      >
         {messages.map((m) => (
           <div
             key={m.id}
@@ -1354,7 +1390,10 @@ export function DataChatPanel({
       </div>
 
       {enableModes ? (
-        <div className="mode-footer">
+        <div
+          className="mode-footer"
+          style={{ display: shouldCollapseDiscoverChat ? 'none' : undefined }}
+        >
           {isModeMenuOpen && (
             <div className="mode-menu">
               {CHAT_MODES.map((mode) => (
@@ -1421,7 +1460,10 @@ export function DataChatPanel({
           </div>
         </div>
       ) : (
-        <div className="chat-input-row">
+        <div
+          className="chat-input-row"
+          style={{ display: shouldCollapseDiscoverChat ? 'none' : undefined }}
+        >
           <textarea
             className="assistant-input chat-input"
             placeholder={placeholderText}
