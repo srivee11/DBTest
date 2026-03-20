@@ -17,8 +17,76 @@ import {
 
 const MONTH_LABELS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
 const LINE_COLORS = ['#4f46e5', '#22c55e', '#f97316', '#ec4899', '#0ea5e9', '#a855f7'];
+const CHART_EDU_GUIDE = [
+  {
+    name: 'Bar chart',
+    useCase: 'Compare values across categories quickly.',
+    description:
+      'Bar chart description: Uses rectangular bars where length maps to value, making category comparison straightforward.'
+  },
+  {
+    name: 'Histogram',
+    useCase: 'Understand distribution of a continuous variable.',
+    description:
+      'Histogram description: Groups numeric values into bins to reveal spread, skew, and outliers.'
+  },
+  {
+    name: 'Column chart',
+    useCase: 'Compare categories and ranked values in a vertical layout.',
+    description:
+      'Column chart description: Vertical bars emphasize differences between groups in a familiar format.'
+  },
+  {
+    name: 'Line chart',
+    useCase: 'Show trends and directional change over an ordered axis, usually time.',
+    description:
+      'Line chart description: Connects data points with lines to highlight progression and trend shape.'
+  },
+  {
+    name: 'Pie chart',
+    useCase: 'Show part-to-whole composition with a small number of categories.',
+    description:
+      'Pie chart description: Circular slices represent share of total, useful for high-level proportion views.'
+  },
+  {
+    name: 'KPI chart',
+    useCase: 'Track core business metrics at a glance against goals or prior periods.',
+    description:
+      'KPI chart description: Focused metric cards or indicators surface top-level performance quickly.'
+  },
+  {
+    name: 'Donut chart',
+    useCase: 'Show part-to-whole with multiple categories and cleaner labeling space.',
+    description:
+      'Donut chart description: A pie variant with a center hole that improves readability and visual balance.'
+  },
+  {
+    name: 'Treemap chart',
+    useCase: 'Compare hierarchical part-to-whole composition.',
+    description:
+      'Treemap chart description: Nested rectangles encode category size and hierarchy in compact space.'
+  },
+  {
+    name: 'Pareto chart',
+    useCase: 'Identify the few categories driving most of the impact.',
+    description:
+      'Pareto chart description: Combines descending bars with cumulative line to reveal 80/20 patterns.'
+  },
+  {
+    name: 'Radar chart',
+    useCase: 'Compare multiple dimensions for one or more entities.',
+    description:
+      'Radar chart description: Plots variables on radial axes to reveal profile shape and balance.'
+  }
+];
 
-export function RetailInsightChart({ data, chartType }) {
+export function RetailInsightChart({
+  data,
+  chartType,
+  visualizerEnabled = false,
+  activeVisualizerChartType,
+  onSelectVisualizerChartType
+}) {
   const {
     aggregatedByCategory,
     aggregatedByProduct,
@@ -244,16 +312,44 @@ export function RetailInsightChart({ data, chartType }) {
     );
   }
 
+  const showVisualizerChips = visualizerEnabled;
+
+  const activeVizType = activeVisualizerChartType ?? chartType ?? 'bar';
+
+  const aggregatedByCategoryShare = useMemo(() => {
+    const denom = totalSales || 0;
+    if (!denom) return aggregatedByCategory;
+    return aggregatedByCategory.map((d) => ({
+      category: d.category,
+      sharePct: Math.round((d.sales / denom) * 1000) / 10 // 1 decimal place
+    }));
+  }, [aggregatedByCategory, totalSales]);
+
+  const vizOptions = [
+    { id: 'bar', label: 'Bar' },
+    { id: 'categoryHBar', label: 'Horizontal bar' },
+    { id: 'categoryShareBar', label: '% of sales' },
+    { id: 'donut', label: 'Donut chart' }
+  ];
+
   return (
     <div className="panel-root chart-card">
       <div className="panel-header">
         <h2>
-          {chartType === 'pie'
+          {chartType === 'donut'
+            ? 'Category share of sales (donut)'
+            : chartType === 'categoryHBar'
+            ? 'Sales by product category (horizontal)'
+            : chartType === 'categoryShareBar'
+            ? 'Sales share by product category (%)'
+            : chartType === 'pie'
             ? 'Category share of sales'
             : chartType === 'productBar'
             ? 'Sales by product'
             : chartType === 'regionCore'
             ? 'Sales by region'
+            : chartType === 'categoryLine'
+            ? 'Sales by product category (line)'
             : chartType === 'line'
             ? 'Sales trend over time'
             : chartType === 'churnByRegion'
@@ -275,6 +371,16 @@ export function RetailInsightChart({ data, chartType }) {
             ? 'Comparing revenue by region for last week versus the previous week.'
             : chartType === 'discoverDelta'
             ? 'Comparing current vs previous period revenue by category so you can see which areas drove the change.'
+            : chartType === 'categoryHBar'
+            ? 'Ranked category sales with categories on the y-axis.'
+            : chartType === 'categoryShareBar'
+            ? 'Each bar shows the category share of total sales.'
+            : chartType === 'categoryLine'
+            ? 'Showing category-level sales as a line chart.'
+            : chartType === 'donut'
+            ? 'Showing category share of total sales (donut view).'
+            : chartType === 'pie'
+            ? 'Showing category share of total sales.'
             : "Focusing on this quarter's sales across product categories."}
         </span>
       </div>
@@ -389,6 +495,60 @@ export function RetailInsightChart({ data, chartType }) {
                 />
               ))}
             </LineChart>
+          ) : chartType === 'categoryLine' ? (
+            <LineChart
+              data={aggregatedByCategory}
+              margin={{ top: 12, right: 16, bottom: 8, left: 0 }}
+            >
+              <CartesianGrid strokeDasharray="3 3" vertical={false} />
+              <XAxis dataKey="category" />
+              <YAxis />
+              <Tooltip />
+              <Legend />
+              <Line
+                type="monotone"
+                dataKey="sales"
+                name="Sales"
+                stroke="var(--accent)"
+                strokeWidth={2}
+                dot={{ r: 3 }}
+              />
+            </LineChart>
+          ) : chartType === 'categoryHBar' ? (
+            <BarChart
+              data={aggregatedByCategory}
+              layout="vertical"
+              margin={{ top: 12, right: 16, bottom: 8, left: 0 }}
+            >
+              <CartesianGrid strokeDasharray="3 3" horizontal={true} vertical={false} />
+              <XAxis type="number" />
+              <YAxis dataKey="category" type="category" />
+              <Tooltip />
+              <Legend />
+              <Bar
+                dataKey="sales"
+                name="Sales"
+                fill="var(--accent)"
+                radius={[4, 4, 0, 0]}
+              />
+            </BarChart>
+          ) : chartType === 'categoryShareBar' ? (
+            <BarChart
+              data={aggregatedByCategoryShare}
+              margin={{ top: 12, right: 16, bottom: 8, left: 0 }}
+            >
+              <CartesianGrid strokeDasharray="3 3" vertical={false} />
+              <XAxis dataKey="category" />
+              <YAxis tickFormatter={(v) => `${v}%`} />
+              <Tooltip />
+              <Legend />
+              <Bar
+                dataKey="sharePct"
+                name="% of sales"
+                fill="var(--accent)"
+                radius={[4, 4, 0, 0]}
+              />
+            </BarChart>
           ) : chartType === 'pie' ? (
             <PieChart margin={{ top: 12, right: 16, bottom: 8, left: 0 }}>
               <Tooltip />
@@ -398,6 +558,26 @@ export function RetailInsightChart({ data, chartType }) {
                 dataKey="sales"
                 nameKey="category"
                 innerRadius="55%"
+                outerRadius="80%"
+                paddingAngle={2}
+              >
+                {aggregatedByCategory.map((entry, idx) => (
+                  <Cell
+                    key={entry.category}
+                    fill={`hsl(${(idx * 60) % 360}, 70%, 55%)`}
+                  />
+                ))}
+              </Pie>
+            </PieChart>
+          ) : chartType === 'donut' ? (
+            <PieChart margin={{ top: 12, right: 16, bottom: 8, left: 0 }}>
+              <Tooltip />
+              <Legend />
+              <Pie
+                data={aggregatedByCategory}
+                dataKey="sales"
+                nameKey="category"
+                innerRadius="60%"
                 outerRadius="80%"
                 paddingAngle={2}
               >
@@ -546,6 +726,46 @@ export function RetailInsightChart({ data, chartType }) {
         </ResponsiveContainer>
       </div>
       )}
+      <div className="chart-chips-row">
+        {showVisualizerChips ? (
+          <div className="chart-visualizer-chips" aria-label="Chart visualization options">
+            {vizOptions.map((opt) => (
+              <button
+                key={opt.id}
+                type="button"
+                className={`chart-visualizer-chip ${
+                  activeVizType === opt.id ? 'is-active' : ''
+                }`}
+                aria-pressed={activeVizType === opt.id}
+                onClick={() => onSelectVisualizerChartType?.(opt.id)}
+              >
+                {opt.label}
+              </button>
+            ))}
+          </div>
+        ) : (
+          <div />
+        )}
+        <div className="chart-edu-info">
+          <button
+            type="button"
+            className="chart-edu-info-btn"
+            aria-label="Chart education guide"
+          >
+            i
+          </button>
+          <div className="chart-edu-tooltip" role="tooltip">
+            <div className="chart-edu-title">WHEN TO USE</div>
+            {CHART_EDU_GUIDE.map((item) => (
+              <div key={item.name} className="chart-edu-item">
+                <strong>{item.name}</strong>
+                <div>{item.useCase}</div>
+                <div>{item.description}</div>
+              </div>
+            ))}
+          </div>
+        </div>
+      </div>
       <div className="chart-actions">
         <div className="chart-actions-left">
           <button type="button" className="chart-action-btn">

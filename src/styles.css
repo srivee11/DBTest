@@ -21,6 +21,9 @@
   --mode-metrics-hover-bg: #fef2f2;
   --mode-why-icon-bg: #dcfce7;
   --mode-why-hover-bg: #ecfdf3;
+  --radius-card-inner: 8px;
+  --chart-card-padding: 10px;
+  --radius-card-outer: calc(var(--radius-card-inner) + var(--chart-card-padding));
 }
 
 *,
@@ -1161,6 +1164,15 @@ textarea {
   height: 220px;
 }
 
+.chart-card {
+  padding: var(--chart-card-padding);
+  border-radius: var(--radius-card-outer);
+}
+
+.chat-chart-region .chart-card {
+  border-radius: var(--radius-card-outer);
+}
+
 .chart-actions {
   margin-top: 8px;
   padding-top: 6px;
@@ -1178,12 +1190,157 @@ textarea {
 }
 
 .chart-action-btn {
-  border-radius: 999px;
+  border-radius: var(--radius-card-inner);
   padding: 4px 10px;
   font-size: 12px;
   border: 1px solid var(--border-subtle);
   background: #ffffff;
   cursor: pointer;
+}
+
+.chart-action-btn:hover {
+  border-color: #d1d5db;
+  background: #f3f4f6;
+  color: #111827;
+}
+
+.chart-visualizer-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin: 0;
+}
+
+.chart-chips-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin-top: 8px;
+  margin-bottom: 2px;
+}
+
+.chart-visualizer-chip {
+  border-radius: var(--radius-card-inner);
+  padding: 4px 10px;
+  font-size: 12px;
+  border: 1px solid var(--border-subtle);
+  background: #ffffff;
+  color: var(--text-muted);
+  cursor: pointer;
+  transition: background 120ms ease, border-color 120ms ease, color 120ms ease;
+}
+
+.chart-visualizer-chip:hover {
+  border-color: rgba(79, 70, 229, 0.45);
+  background: rgba(79, 70, 229, 0.08);
+  color: #111827;
+}
+
+.chart-visualizer-chip.is-active {
+  border-color: var(--accent);
+  background: var(--accent-soft);
+  color: #111827;
+}
+
+.chart-edu-info {
+  position: relative;
+  flex-shrink: 0;
+}
+
+.chart-edu-info::after {
+  content: '';
+  position: absolute;
+  top: 18px;
+  right: 0;
+  width: 22px;
+  height: 10px; /* hover bridge between icon and tooltip */
+}
+
+.chart-edu-info-btn {
+  width: 18px;
+  height: 18px;
+  border-radius: 999px;
+  border: 1px solid rgba(148, 163, 184, 0.7);
+  background: #ffffff;
+  color: var(--text-muted);
+  font-size: 12px;
+  font-weight: 700;
+  padding: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+}
+
+.chart-edu-tooltip {
+  position: absolute;
+  top: 24px;
+  right: 0;
+  width: min(360px, 84vw);
+  max-height: 260px;
+  overflow: auto;
+  background: #0f172a;
+  border-radius: 10px;
+  border: 1px solid rgba(148, 163, 184, 0.6);
+  color: #f9fafb;
+  box-shadow: 0 12px 30px rgba(15, 23, 42, 0.35);
+  padding: 8px 10px;
+  font-size: 12px;
+  line-height: 1.3;
+  opacity: 0;
+  visibility: hidden;
+  pointer-events: none;
+  transform: translateY(-2px);
+  transition:
+    opacity 140ms ease-out,
+    transform 140ms ease-out,
+    visibility 0s linear 180ms;
+  z-index: 6;
+  scrollbar-width: thin;
+  scrollbar-color: rgba(148, 163, 184, 0.75) rgba(30, 41, 59, 0.5);
+}
+
+.chart-edu-item + .chart-edu-item {
+  margin-top: 8px;
+  padding-top: 8px;
+  border-top: 1px solid rgba(148, 163, 184, 0.35);
+}
+
+.chart-edu-title {
+  font-size: 12px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  margin-bottom: 8px;
+}
+
+.chart-edu-info:hover .chart-edu-tooltip,
+.chart-edu-info:focus-within .chart-edu-tooltip {
+  opacity: 1;
+  visibility: visible;
+  pointer-events: auto;
+  transform: translateY(0);
+  transition-delay: 0s, 0s, 0s;
+}
+
+.chart-edu-tooltip::-webkit-scrollbar {
+  width: 10px;
+}
+
+.chart-edu-tooltip::-webkit-scrollbar-track {
+  background: rgba(30, 41, 59, 0.5);
+  border-radius: 999px;
+}
+
+.chart-edu-tooltip::-webkit-scrollbar-thumb {
+  background: linear-gradient(180deg, rgba(148, 163, 184, 0.9), rgba(100, 116, 139, 0.95));
+  border-radius: 999px;
+  border: 2px solid rgba(15, 23, 42, 0.85);
+}
+
+.chart-edu-tooltip::-webkit-scrollbar-thumb:hover {
+  background: linear-gradient(180deg, rgba(203, 213, 225, 0.95), rgba(148, 163, 184, 0.95));
 }
 
 .chart-actions-right {
@@ -1200,7 +1357,7 @@ textarea {
 .chart-toggle {
   width: 38px;
   height: 20px;
-  border-radius: 999px;
+  border-radius: var(--radius-card-inner);
   border: 1px solid var(--border-subtle);
   background: #f3f4f6;
   padding: 1px;
@@ -1213,17 +1370,23 @@ textarea {
 .chart-toggle-thumb {
   width: 16px;
   height: 16px;
-  border-radius: 999px;
+  border-radius: calc(var(--radius-card-inner) - 2px);
   background: #ffffff;
   box-shadow: 0 1px 2px rgba(15, 23, 42, 0.12);
 }
 
 .chart-sql-btn {
-  border-radius: 999px;
+  border-radius: var(--radius-card-inner);
   padding: 4px 8px;
   border: 1px solid var(--border-subtle);
   background: #ffffff;
   cursor: pointer;
+}
+
+.chart-sql-btn:hover {
+  border-color: #d1d5db;
+  background: #f3f4f6;
+  color: #111827;
 }
 
 .chart-sql-icon {

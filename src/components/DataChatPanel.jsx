@@ -341,17 +341,23 @@ export function DataChatPanel({
   titleOverride,
   subtitleOverride,
   badgeLabel,
-  variant
+  variant,
+  cacheKey,
+  enableChartVisualizer = false
 }) {
-  const [input, setInput] = useState(() => CHAT_CACHE[datasetId]?.input ?? '');
+  const resolvedCacheKey = cacheKey ?? datasetId;
+
+  const [input, setInput] = useState(
+    () => CHAT_CACHE[resolvedCacheKey]?.input ?? ''
+  );
   const [selectedSuggestionId, setSelectedSuggestionId] = useState(
-    () => CHAT_CACHE[datasetId]?.selectedSuggestionId ?? 'spotify-bar'
+    () => CHAT_CACHE[resolvedCacheKey]?.selectedSuggestionId ?? 'spotify-bar'
   );
   const [chartType, setChartType] = useState(
-    () => CHAT_CACHE[datasetId]?.chartType ?? 'topTracks'
+    () => CHAT_CACHE[resolvedCacheKey]?.chartType ?? 'topTracks'
   );
   const [messages, setMessages] = useState(() => {
-    const cached = CHAT_CACHE[datasetId]?.messages;
+    const cached = CHAT_CACHE[resolvedCacheKey]?.messages;
     if (cached && cached.length) return cached;
     const isRetailInit = datasetId === 'retail_store';
     const isDiscoverInit = variant === 'discover';
@@ -360,7 +366,7 @@ export function DataChatPanel({
   });
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [activeModeId, setActiveModeId] = useState(
-    () => CHAT_CACHE[datasetId]?.activeModeId ?? 'plan'
+    () => CHAT_CACHE[resolvedCacheKey]?.activeModeId ?? 'plan'
   );
   const [isModeMenuOpen, setIsModeMenuOpen] = useState(false);
   const scrollRef = useRef(null);
@@ -399,8 +405,29 @@ export function DataChatPanel({
 
   const shouldCollapseDiscoverChat = isRetail && isDiscoverAgent && isDiscoverChatCollapsed;
 
+  const handleVisualizerSelect = (baseMessage, nextChartType) => {
+    if (!enableChartVisualizer) return;
+    if (!isRetail) return;
+    if (!nextChartType) return;
+
+    setMessages((prev) => [
+      ...prev,
+      {
+        id: `viz-${baseMessage.id}-${nextChartType}-${Date.now()}`,
+        role: 'assistant',
+        kind: 'retailChart',
+        chartType: nextChartType,
+        content: baseMessage.content,
+        status: 'complete',
+        timestamp: new Date().toISOString()
+      }
+    ]);
+
+    setChartType(nextChartType);
+  };
+
   useEffect(() => {
-    const cached = CHAT_CACHE[datasetId];
+    const cached = CHAT_CACHE[resolvedCacheKey];
 
     if (cached) {
       setInput(cached.input ?? '');
@@ -426,7 +453,7 @@ export function DataChatPanel({
 
     setIsModeMenuOpen(false);
     setIsDiscoverChatCollapsed(false);
-  }, [datasetId, isRetail]);
+  }, [resolvedCacheKey, datasetId, isRetail]);
 
   useEffect(() => {
     if (!scrollRef.current) return;
@@ -434,14 +461,14 @@ export function DataChatPanel({
   }, [messages]);
 
   useEffect(() => {
-    CHAT_CACHE[datasetId] = {
+    CHAT_CACHE[resolvedCacheKey] = {
       input,
       selectedSuggestionId,
       chartType,
       messages,
       activeModeId
     };
-  }, [datasetId, input, selectedSuggestionId, chartType, messages, activeModeId]);
+  }, [resolvedCacheKey, input, selectedSuggestionId, chartType, messages, activeModeId]);
 
   const toggleDiscoverKpi = (kpi) => {
     setDiscoverSelectedKpis((prev) =>
@@ -1378,6 +1405,11 @@ export function DataChatPanel({
                     <RetailInsightChart
                       data={activeRows}
                       chartType={m.chartType || 'bar'}
+                      visualizerEnabled={enableChartVisualizer}
+                      activeVisualizerChartType={m.chartType || 'bar'}
+                      onSelectVisualizerChartType={(nextType) =>
+                        handleVisualizerSelect(m, nextType)
+                      }
                     />
                   </div>
                 </>

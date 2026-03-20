@@ -116,6 +116,13 @@ export default function App() {
           <DataChatPanel
             datasetId={datasetId}
             data={filteredData}
+            titleSuffix="(V3 - Chart options + Tooltip)"
+            cacheKey={`${datasetId}::v3`}
+            enableChartVisualizer
+          />
+          <DataChatPanel
+            datasetId={datasetId}
+            data={filteredData}
             titleOverride="Discover Agent"
             subtitleOverride="Discover Agent – continuously monitors your KPIs and automatically drills into segments when something moves."
             variant="discover"
